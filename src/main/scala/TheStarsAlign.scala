@@ -39,7 +39,7 @@ object TheStarsAlign {
   }
 
   def containsLetters(points: List[Point]): Boolean = {
-    verticalLines(points).count(line => line.length > 4) >= 10 // sensible number of lines that could be a message
+    verticalLines(points).count(line => line.length > 8) >= 4 // sensible number of lines that could be letters
   }
 
   def verticalLines(points: List[Point]): List[Line] = {
