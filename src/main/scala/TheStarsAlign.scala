@@ -2,6 +2,21 @@ import scala.io.Source
 
 object TheStarsAlign {
 
+  val maxIterations = 100000
+
+  val letterWidth = 6
+  val letterHeight = 9
+  val letterSpacing = 2
+
+  val letters = Map(
+    ("#####.\n#....#\n#....#\n#....#\n#####.\n#....#\n#....#\n#....#\n#....#\n#####.", 'B'),
+    (".####.\n#....#\n#.....\n#.....\n#.....\n#..###\n#....#\n#....#\n#...##\n.###.#", 'G'),
+    ("#....#\n#....#\n#....#\n#....#\n######\n#....#\n#....#\n#....#\n#....#\n#....#", 'H'),
+    ("#....#\n#...#.\n#..#..\n#.#...\n##....\n##....\n#.#...\n#..#..\n#...#.\n#....#", 'K'),
+    ("#####.\n#....#\n#....#\n#....#\n#####.\n#.....\n#.....\n#.....\n#.....\n#.....", 'P'),
+    ("#####.\n#....#\n#....#\n#....#\n#####.\n#..#..\n#...#.\n#...#.\n#....#\n#....#", 'R')
+  )
+
   def parse(line: String): Point = {
     val parts = line.split("[<>, ]+")
     Point(parts(1).toInt, parts(2).toInt, parts(4).toInt, parts(5).toInt)
@@ -22,48 +37,41 @@ object TheStarsAlign {
     Point(point.x + point.vx, point.y + point.vy, point.vx, point.vy)
   }
 
-  def sequences(numbers: List[Int]): List[List[Int]] = {
-    numbers
-      .distinct
-      .sorted
-      .foldLeft(List[List[Int]]()) { (segments, n) =>
-        segments match {
-          case current :: finished =>
-            if (current.head == n - 1) // segment continues
-              (n :: current) :: finished
-            else // segment ends, new segment begins
-              List(n) :: segments
-          case Nil => List(List(n))
-        }
-      }
-  }
-
-  def containsLetters(points: List[Point]): Boolean = {
-    verticalLines(points).count(line => line.length > 8) >= 4 // sensible number of lines that could be letters
-  }
-
-  def verticalLines(points: List[Point]): List[Line] = {
-    points
-      .groupBy(_.x)
-      .flatMap { case (x, column) => sequences(column.map(_.y))
-        // a segment must have at least 2 elements to be a line
-        .filter(segment => segment.size > 1)
-        .map(segment => Line(x, segment.head - segment.size + 1, x, segment.head))
-      }
-      .toList
-  }
-
-  def message(points: List[Point], seconds: Int = 0): List[Point] = {
-    if (seconds >= 100000) // some safe limit
+  def message(points: List[Point], seconds: Int = 0): String = {
+    if (seconds >= maxIterations) // some safe limit
       throw new Exception("No message found")
 
     val bb = boundingBox(points)
 
-    // quick exit if box too large
-    if (bb.width < 100 && bb.height < 100 && containsLetters(points)) {
+    if (bb.height == letterHeight) {
       println(s"Possible message at $seconds seconds")
-      points
+
+      printPoints(points)
+
+      ocr(points)
     } else message(points.map(move), seconds + 1)
+  }
+
+  def ocr(points: List[Point]): String = {
+    val bb = boundingBox(points)
+
+    val letterCount = (bb.width + letterSpacing) / (letterWidth + letterSpacing)
+
+    (0 to letterCount)
+      .map { i =>
+        val x1 = bb.x1 + i * (letterWidth + letterSpacing)
+        val lbb = BoundingBox(x1, bb.y1, x1 + letterWidth - 1, bb.y2)
+
+        val str = (lbb.y1 to lbb.y2).foldLeft("") { (str, y) =>
+          str + (lbb.x1 to lbb.x2).foldLeft("") { (line, x) =>
+            if (points.exists(p => p.x == x && p.y == y)) line + "#"
+            else line + "."
+          } + "\n"
+        }
+
+        letters.getOrElse(str.trim(), '?')
+      }
+      .mkString("")
   }
 
   def printPoints(points: List[Point]): Unit = {
@@ -82,7 +90,7 @@ object TheStarsAlign {
     val input = Source.fromFile("10.txt").getLines().toList
 
     val points = input.map(parse)
-    printPoints(message(points))
+    println(message(points))
   }
 
   case class Point(x: Int, y: Int, vx: Int, vy: Int)
